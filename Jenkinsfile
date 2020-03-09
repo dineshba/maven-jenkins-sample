@@ -1,7 +1,23 @@
 #!/usr/bin/env groovy
 
 pipeline {
-    agent any
+    agent {
+    kubernetes {
+      yaml """
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    some-label: some-label-value
+spec:
+  containers:
+  - name: docker
+    image: docker:18.05-dind
+    securityContext:
+        privileged: true
+"""
+        }
+    }
     stages {
         stage('Validations') {
             parallel {
@@ -46,15 +62,14 @@ pipeline {
             }
         }
         stage('docker build') {
-            // agent {
-            //    label 'with-docker'
-            // }
             steps {
+              container('docker') {
                 unstash 'app'
                 script {
                     def imageTag = "registry.gitlab.com/devops-venice/sample-app:${GIT_BRANCH}-${BUILD_NUMBER}"
                     sh "docker build -f docker/Dockerfile . -t ${imageTag} --label vcs-url:${GIT_URL} --label vcs-ref:${GIT_COMMIT}"
                 }
+              }
             }
         }
     }
